@@ -26,28 +26,35 @@ class inf_node():
         if os.path.isfile('node_blocks' + str(p2p_port) + '.txt'):
             with open('node_blocks' + str(p2p_port) + '.txt', 'r') as read_file:
                 lines = read_file.readlines()
-                last_block = json.loads(lines[-1])
-                self.prev_block = bytes(last_block["block_hash"], encoding='utf8')
-                self.nonce =  b"00000000"
-                self.block_height = len(lines)
-                
-                self.sendHeader(last_block)
+                if len(lines)>0:
+                    last_block = json.loads(lines[-1])
+                    self.prev_block = bytes(last_block["block_hash"], encoding='utf8')
+                    self.nonce =  b"00000000"
+                    self.block_height = len(lines)-1
+                    print("height : " +  str(self.block_height))
+                    if self.sendHeader(last_block):
+                        self.getBlocks(0, str(self.prev_block, encoding='utf8'), '0')
+                else:
+                    self.prev_block = b"0000000000000000000000000000000000000000000000000000000000000000"
+                    self.nonce =  b"00000000"
+                    self.block_height = -1
                 
         else:
 
             
             self.prev_block = b"0000000000000000000000000000000000000000000000000000000000000000"
             self.nonce =  b"00000000"
-            self.block_height = 0
+            self.block_height = -1
             with open('node_blocks' + str(p2p_port) + '.txt', 'w') as outfile:
                 pass
 
         self.threads = []
         self.threads.append(threading.Thread(target = self.p2p_listen))
+        self.threads.append(threading.Thread(target = self.user_listen))
         self.threads[0].start()
-
+        self.threads[1].start()
         
-        while self.p2p_server_ready == False:
+        while self.p2p_server_ready == False or self.user_server_ready == False:
             pass
         
         
@@ -72,16 +79,22 @@ class inf_node():
             
             
             if sha256_result<=str(self.target,encoding='utf8'):
-                print(sha256_result)
-                self.block_height +=1
-                self.now_block = { "block_hash": sha256_result, "block_header":  str(data, encoding='utf8') , "block_height": self.block_height}
-                with open('node_blocks' + str(self.p2p_port) + '.txt', 'a+', encoding='utf8') as outfile: 
-                    json.dump(self.now_block, outfile)
-                    outfile.write("\n")
+                print("mined: " + sha256_result)
                 
-                self.sendHeader(self.now_block)
-
-                self.prev_block = bytes(sha256_result, encoding='utf8') 
+                now_block_height = self.block_height +1 
+                now_block = { "block_hash": sha256_result, "block_header":  str(data, encoding='utf8') , "block_height": now_block_height}
+                fail_flag = self.sendHeader(now_block)
+                
+                if fail_flag==True:
+                    self.getBlocks(0, str(self.prev_block, encoding='utf8'), "0")
+                else:
+                    if now_block != self.block_height:
+                        self.block_height = now_block_height
+                        self.now_block = now_block
+                        with open('node_blocks' + str(self.p2p_port) + '.txt', 'a+', encoding='utf8') as outfile: 
+                            json.dump(self.now_block, outfile)
+                            outfile.write("\n")
+                        self.prev_block = bytes(sha256_result, encoding='utf8') 
                 
                 
             
@@ -90,12 +103,15 @@ class inf_node():
             
     def sendHeader(self, header_data):
         
-        p2p_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        
         
         to_send = json.dumps( {"method": "sendHeader", "data": header_data} )
         
         fail_flag = False
         for neighbor in self.neighbor_list:
+            p2p_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+            
+            print("sendHeader send to: " + str(neighbor["p2p_port"]))
             if p2p_client.connect_ex((neighbor["ip"], neighbor["p2p_port"]))==0:
                 try:
                     p2p_client.send(to_send.encode('utf-8')) 
@@ -108,58 +124,117 @@ class inf_node():
                     
                 except ConnectionResetError as e:
                     print(e)
-                p2p_client.close()
+            p2p_client.close()
         
-        if fail_flag==True:
-            self.getBlocks(0, str(self.prev_block, encoding='utf8'), "0")
+        return fail_flag
+
         
-        #to_send = json.dumps( {"method": "getBlocks", "data": {"hash_count" : json_received["data"]["block_height"] - self.block_height, "hash_begin" : str(self.prev_block, encoding = 'uft8'), "hash_stop" : json_received["data"]["block_hash"]}})
-        #conn.send(to_send.encode('utf-8'))
+
         
     def getBlocks(self, hash_count, hash_begin, hash_stop):
         
         
-        p2p_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        
         
         if len(self.neighbor_list)>0:
             
             for neighbor in self.neighbor_list:
-                
+                p2p_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                print("getblocks send to: " + str(neighbor["p2p_port"]))
                 if p2p_client.connect_ex((neighbor["ip"], neighbor["p2p_port"]))==0:
                     
             
                     try:
+                        
+                        
                         to_send = json.dumps( {"method": "getBlocks", "data": {"hash_count" : hash_count, "hash_begin" :  hash_begin, "hash_stop" : hash_stop}})
                         p2p_client.send(to_send.encode('utf-8'))
-                        recv_data = p2p_client.recv(TRANS_SIZE).decode()
-                        json_recv = json.loads(recv_data)
-                        print(json_recv)
-                        if json_recv["error"]==0:
-                            with open('node_blocks' + str(self.p2p_port) + '.txt', 'a+', encoding='utf8') as outfile:
-                                
-                                for block in json_recv["result"]:
-                                    self.block_height += 1
-                                    self.now_block = { "block_hash": hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), "block_header":  block, "block_height": self.block_height}
-                                    self.prev_block = bytes(hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), encoding='utf8')
-                                    json.dump(self.now_block, outfile)
-                                    outfile.write("\n")
-                        else:
+                        
+                        recv_data = ""
+                        
+                        
+                        while 1:
                             
-                            with open('node_blocks' + str(self.p2p_port) + '.txt', 'r', encoding='utf8') as readfile:
-                                lines = readfile.readlines()
-                            with open('node_blocks' + str(self.p2p_port) + '.txt', 'w', encoding='utf8') as writefile:
-                                 for i in range(len(lines)-1):
-                                     writefile.write(lines[i])
-                                     
+                            recv_buffer = p2p_client.recv(TRANS_SIZE).decode()
+                            recv_data += recv_buffer
+                            
+                            if not recv_buffer:
+                                break
+                            
+                        
+                        print(recv_data)
+                        json_recv = json.loads(recv_data)
+                        
+                        if json_recv["error"]==0:
+                            
+                            if hash_count ==0:
+                            
+                                with open('node_blocks' + str(self.p2p_port) + '.txt', 'a+', encoding='utf8') as outfile:
+                                    
+                                    for block in json_recv["result"]:
+                                        self.block_height += 1
+                                        self.now_block = { "block_hash": hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), "block_header":  block, "block_height": self.block_height}
+                                        self.prev_block = bytes(hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), encoding='utf8')
+                                        json.dump(self.now_block, outfile)
+                                        outfile.write("\n")
+                                        
+                                    p2p_client.close()
+                                    break
+                            else:
+                                with open('node_blocks' + str(self.p2p_port) + '.txt', 'w', encoding='utf8') as outfile:
+                                    self.block_height = -1
+                                    for block in json_recv["result"]:
+                                        self.block_height += 1
+                                        self.now_block = { "block_hash": hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), "block_header":  block, "block_height": self.block_height}
+                                        self.prev_block = bytes(hashlib.sha256(bytes(block, encoding='utf8')).hexdigest(), encoding='utf8')
+                                        json.dump(self.now_block, outfile)
+                                        outfile.write("\n")
+                                        
+                                    p2p_client.close()
+                                    break
+                        else:
+                            print("getBlocks got error")
+                            
+                            
                              
                     except ConnectionResetError as e:
                         print(e)
                     
-                    p2p_client.close()
+                p2p_client.close()
                     
     
     def getBlockCount(self):
-        return {"error": 0,  "result":self.block_height}
+        return {"error": 0,  "result":self.block_height+1}
+    
+    def getBlockHash(self, block_height):
+        
+        if block_height>self.block_height:
+            
+            return {"error": 1,  "result": None}   
+        else:
+            with open('node_blocks' + str(self.p2p_port) + '.txt', 'r', encoding='utf8') as readfile:
+                lines = readfile.readlines()
+                BlockHash = json.loads(lines[block_height])["block_hash"]
+                return {"error": 0,  "result": BlockHash}
+        
+    def getBlockHeader(self, block_hash):
+        with open('node_blocks' + str(self.p2p_port) + '.txt', 'r', encoding='utf8') as readfile:
+            lines = readfile.readlines()
+            for line in lines:
+                json_line = json.loads(line)
+                if block_hash == json_line["block_hash"]:
+                    
+                    prev_block = json_line["block_header"][8:72]
+                    merkle_root = "0000000000000000000000000000000000000000000000000000000000000000"
+                    target = json_line["block_header"][136:200]
+                    nonce = json_line["block_header"][200:]
+                    
+                    result = {"version" : 1, "prev_block" : prev_block, "merkle_root": merkle_root, "target": target, "nonce": nonce}
+                    
+                    
+                    return {"error": 0,  "result": result}
+                
+            return {"error": 1,  "result": None}
     
     def p2p_listen(self):
         self.p2p_server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -204,8 +279,8 @@ class inf_node():
                             else:
                                 to_send =  json.dumps({"error":0})
                                 conn.send(to_send.encode('utf-8'))
-                                get_block_flag = True
-                                get_block_hash_count = json_received["data"]["block_height"] - self.block_height
+                                get_block_flag = True #再來處理這ˇ
+                                
                                 get_block_hash_begin = str(self.prev_block, encoding = 'utf8')
                                 get_block_hash_stop =  json_received["data"]["block_hash"]
                         else:
@@ -215,36 +290,47 @@ class inf_node():
                 elif json_received["method"] == "getBlocks":
                     blocks = []
                     out_flag = False
+                    
+                    
+                    
                     with open('node_blocks' + str(self.p2p_port) + '.txt', 'r', encoding='utf8') as readfile:
                         
                         lines = readfile.readlines()
-                        
-                        for line in lines:
-                            if out_flag==True:
+                        if json_received["data"]["hash_count"] != 0 and len(lines)>= json_received["data"]["hash_count"] :
+                            for line in lines[:json_received["data"]["hash_count"]]:
                                 blocks.append(json.loads(line)["block_header"])
                             
-                            print(json_received["data"]["hash_begin"])
-                            print("0000000000000000000000000000000000000000000000000000000000000000")
-                            
-                            if json_received["data"]["hash_begin"] == "0000000000000000000000000000000000000000000000000000000000000000":
-                                out_flag = True
-                            if json.loads(line)["block_hash"]==json_received["data"]["hash_begin"]:
-                                out_flag = True
-                            elif json.loads(line)["block_hash"]==json_received["data"]["hash_stop"]:
-                                out_flag = False
+                        else:
+                            for line in lines:
                                 
+                                if json_received["data"]["hash_begin"] == "0000000000000000000000000000000000000000000000000000000000000000":
+                                    out_flag = True
+                                
+                                if out_flag==True:
+                                    blocks.append(json.loads(line)["block_header"])
+                                    
+    
+                                if json.loads(line)["block_hash"]==json_received["data"]["hash_begin"]:
+                                    out_flag = True
+                                elif json.loads(line)["block_hash"]==json_received["data"]["hash_stop"]:
+                                    out_flag = False
+                            
                             
                     if len(blocks)>0:          
                         getBlocks_reply = json.dumps({"error":0, "result": blocks})
                     else:
                         getBlocks_reply = json.dumps({"error":1, "result": []})
+                    
+                    buffer = getBlocks_reply.encode('utf-8')
+                    conn.send(buffer)
+
                         
-                    conn.send(getBlocks_reply.encode('utf-8'))
+                   
                 conn.close()
                 
                 if get_block_flag:
-                   
-                    self.getBlocks(get_block_hash_count, get_block_hash_begin, get_block_hash_stop)
+                    print("listen and get")
+                    self.getBlocks(self.block_height+1, get_block_hash_begin, get_block_hash_stop)
                 
             except ConnectionResetError as e:
                 print(e)
@@ -253,10 +339,38 @@ class inf_node():
             
     def user_listen(self):   
         self.user_server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.user_server.bind((self.ip, self.p2p_port))
+        self.user_server.bind((self.ip, self.user_port))
         self.user_server.listen(len(self.neighbor_list))
         self.user_server_ready = True
-
+        
+        while True:
+            conn,addr = self.user_server.accept()
+            
+            print(conn,addr)
+            print(conn.getpeername())
+            
+            
+            try:
+                
+                
+                data = conn.recv(TRANS_SIZE).decode()
+                print('recive:',data) 
+                json_received = json.loads(data)
+                
+                if json_received["method"] == "getBlockCount":
+                    to_send = json.dumps(self.getBlockCount())
+                    conn.send(to_send.encode('utf-8'))
+                elif json_received["method"] == "getBlockHash":
+                    to_send = json.dumps(self.getBlockHash(json_received["data"]["block_height"]))
+                    conn.send(to_send.encode('utf-8'))
+                elif json_received["method"] == "getBlockHeader":
+                    to_send = json.dumps(self.getBlockHeader(json_received["data"]["block_hash"]))
+                    conn.send(to_send.encode('utf-8'))
+                
+                conn.close()
+                
+            except ConnectionResetError as e:
+                print(e)
         
 if __name__ == '__main__':
     
