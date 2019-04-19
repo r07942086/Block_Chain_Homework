@@ -47,7 +47,7 @@ class inf_node():
             self.block_height = -1
             with open('node_blocks' + str(p2p_port) + '.txt', 'w') as outfile:
                 pass
-            self.getBlocks(0, str(self.prev_block, encoding='utf8'), '0')
+            self.getBlocks(0, "0000000000000000000000000000000000000000000000000000000000000000", '0')
 
 
         self.threads = []
@@ -295,9 +295,6 @@ class inf_node():
                                 to_send =  json.dumps({"error":0})
                                 conn.send(to_send.encode('utf-8'))
                                 get_block_flag = True #再來處理這ˇ
-                                
-                                get_block_hash_begin = str(self.prev_block, encoding = 'utf8')
-                                get_block_hash_stop =  json_received["data"]["block_hash"]
                         else:
                             to_send =  json.dumps({"error":1})
                             conn.send(to_send.encode('utf-8'))
@@ -311,16 +308,39 @@ class inf_node():
                     with open('node_blocks' + str(self.p2p_port) + '.txt', 'r', encoding='utf8') as readfile:
                         
                         lines = readfile.readlines()
-                        if json_received["data"]["hash_count"] != 0 and len(lines)>= json_received["data"]["hash_count"] :
+                        
+                        if json_received["data"]["hash_count"] != 0 and len(lines)>= json_received["data"]["hash_count"] and json_received["data"]["hash_begin"]=="0" and json_received["data"]["hash_stop"]=="0" :
                             for line in lines[:json_received["data"]["hash_count"]+1]:
                                 blocks.append(json.loads(line)["block_header"])
+                            if len(blocks)>0:          
+                                getBlocks_reply = json.dumps({"error":0, "result": blocks})
+                            else:
+                                getBlocks_reply = json.dumps({"error":1, "result": []})
                             
-                        else:
+                        elif json_received["data"]["hash_count"] == 0 and len(lines)>= json_received["data"]["hash_count"] and json_received["data"]["hash_begin"]=="0000000000000000000000000000000000000000000000000000000000000000" and json_received["data"]["hash_stop"]=="0" :
+                            if json_received["data"]["hash_begin"] == "0000000000000000000000000000000000000000000000000000000000000000":
+                                    out_flag = True
                             for line in lines:
                                 
-                                if json_received["data"]["hash_begin"] == "0000000000000000000000000000000000000000000000000000000000000000":
-                                    out_flag = True
                                 
+                                
+                                if out_flag==True:
+                                    blocks.append(json.loads(line)["block_header"])
+                                    
+    
+                                if json.loads(line)["block_hash"]==json_received["data"]["hash_begin"]:
+                                    out_flag = True
+                                elif json.loads(line)["block_hash"]==json_received["data"]["hash_stop"]:
+                                    out_flag = False
+                            if len(blocks)>0:          
+                                getBlocks_reply = json.dumps({"error":0, "result": blocks})
+                            else:
+                                getBlocks_reply = json.dumps({"error":1, "result": []})
+                            
+
+
+                        else:
+                            for line in lines:
                                 if out_flag==True:
                                     blocks.append(json.loads(line)["block_header"])
                                     
@@ -331,21 +351,20 @@ class inf_node():
                                     out_flag = False
                             
                             
-                    if len(blocks)>0:          
-                        getBlocks_reply = json.dumps({"error":0, "result": blocks})
-                    else:
-                        getBlocks_reply = json.dumps({"error":1, "result": []})
-                    
-                    buffer = getBlocks_reply.encode('utf-8')
-                    conn.send(buffer)
-
+                            if len(blocks)>0 and len(blocks)==json_received["data"]["hash_count"]:          
+                                getBlocks_reply = json.dumps({"error":0, "result": blocks})
+                            else:
+                                getBlocks_reply = json.dumps({"error":1, "result": []})
+                            
+                        buffer = getBlocks_reply.encode('utf-8')
+                        conn.send(buffer)
                         
                    
                 conn.close()
                 
                 if get_block_flag:
                     print("listen and get")
-                    self.getBlocks(json_received["data"]["block_height"], get_block_hash_begin, get_block_hash_stop)
+                    self.getBlocks(json_received["data"]["block_height"], "0","0")
                 
             except ConnectionResetError as e:
                 print(e)
