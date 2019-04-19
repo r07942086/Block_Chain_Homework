@@ -3,9 +3,9 @@ import socket
 
 user_client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 
-send = {"method": "getBlockCount"}
-#send =  { "method": "getBlockHash", "data": { "block_height": 150}}   
-#send = {"method": "getBlockHeader","data": {"block_hash": "00000092c8c033b87a49d72af887f895f5e32d670747a22e79c9e2b495337ffc"}}
+#send = {"method": "getBlockCount"}
+#send =  { "method": "getBlockHash", "data": { "block_height": 10}}   
+send = {"method": "getBlockHeader","data": {"block_hash": "00000092c8c033b87a49d72af887f895f5e32d670747a22e79c9e2b495337ffc"}}
 
 
 to_send = json.dumps(send)

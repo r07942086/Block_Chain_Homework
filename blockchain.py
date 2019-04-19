@@ -164,8 +164,6 @@ class inf_node():
                             if not recv_buffer:
                                 break
                             
-                        
-                        print(recv_data)
                         json_recv = json.loads(recv_data)
                         
                         if json_recv["error"]==0:
@@ -211,6 +209,7 @@ class inf_node():
                                     p2p_client.close()
                                     break
                         else:
+                            pass
                             print("getBlocks got error")
                             
                             
@@ -261,11 +260,7 @@ class inf_node():
         self.p2p_server_ready = True
         while True:
             conn,addr = self.p2p_server.accept()
-            
-            print(conn,addr)
-            print(conn.getpeername())
-            
-            
+                                    
             try:
                 get_block_flag = False
                 
@@ -293,7 +288,9 @@ class inf_node():
                                     
                                 to_send =  json.dumps({"error":0})
                                 conn.send(to_send.encode('utf-8')) 
-                                
+                            elif json_received["data"]["block_height"]==self.block_height:
+                                to_send =  json.dumps({"error":0})
+                                conn.send(to_send.encode('utf-8')) 
                             else:
                                 to_send =  json.dumps({"error":0})
                                 conn.send(to_send.encode('utf-8'))
