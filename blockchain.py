@@ -210,7 +210,7 @@ class inf_node():
                                     break
                         else:
                             pass
-                            print("getBlocks got error")
+                            
                             
                             
                              
@@ -265,7 +265,7 @@ class inf_node():
                 get_block_flag = False
                 
                 data = conn.recv(TRANS_SIZE).decode()
-                print('recive:',data) 
+                
                 json_received = json.loads(data)
                 
                 if json_received["method"] == "sendHeader":
@@ -363,9 +363,9 @@ class inf_node():
                 conn.close()
                 
                 if get_block_flag:
-                    print("listen and get")
+                    
                     self.getBlocks(json_received["data"]["block_height"], "0","0")
-                
+                    self.getBlocks(json_received["data"]["block_height"]+1, "0000000000000000000000000000000000000000000000000000000000000000",json_received["data"]["block_hash"])
             except ConnectionResetError as e:
                 print(e)
                 
@@ -381,7 +381,7 @@ class inf_node():
             conn,addr = self.user_server.accept()
             
             print(conn,addr)
-            print(conn.getpeername())
+            
             
             
             try:
