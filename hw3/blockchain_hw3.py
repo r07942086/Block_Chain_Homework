@@ -299,6 +299,9 @@ class inf_node():
                 print(self.getbalance(self.block_height))
             except ConnectionResetError as e:
                 print(e)
+                to_send = json.dumps({"error":1})
+                conn.send(to_send.encode('utf-8'))
+                conn.close()
                 
     def sendTransaction(self,address,amount):
         
@@ -370,11 +373,29 @@ class inf_node():
                     conn.send(to_send.encode('utf-8'))
                     self.sendTransaction(json_received["data"]["address"],json_received["data"]["amount"])
                     
-                
+                if json_received["method"] == "getbalance":
+                    
+                    if self.block_height-2 <0:
+                        to_send = json.dumps({"error":0, "balance": 0})
+                    else:
+                        balance = self.getbalance(self.block_height-2)
+                        if json_received["data"]["address"] in balance:
+                            value = balance[json_received["data"]["address"]]
+                        else:
+                            value = 0
+                        to_send = json.dumps({"error":0, "balance": value})
+                    
+                    conn.send(to_send.encode('utf-8'))
+                    
+                    
+                    
+                    
                 conn.close()
             except ConnectionResetError as e:
                 print(e)
-                
+                to_send = json.dumps({"error":1})
+                conn.send(to_send.encode('utf-8'))
+                conn.close()
                 
                 
     def getbalance(self, block_height):
