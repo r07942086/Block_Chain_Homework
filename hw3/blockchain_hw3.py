@@ -103,7 +103,7 @@ class inf_node():
 
                                                             
                 now_block_height = self.block_height +1 
-                now_block = { "prev_block": str(self.prev_block, encoding='utf8'), "version":  2,  "target": str(self.target, encoding='utf8'), "nonce":  str(nonce_new, encoding='utf8'),
+                now_block = { "prev_block": str(self.prev_block, encoding='utf8'), "version":  2,  "target": str(self.target, encoding='utf8'), "nonce":  int(str(nonce_new, encoding='utf8')),
                              "transactions_hash":  str(self.transactions_hash, encoding='utf8'), "beneficiary": str(self.beneficiary, encoding='utf8'),
                              "transactions": self.now_txs}
                 fail_flag = self.sendBlock(now_block)
@@ -128,8 +128,7 @@ class inf_node():
                     print(self.blocks)
                     print(self.getbalance(self.block_height))
             
-            if self.block_height>4:
-                pass
+
         
         
         
@@ -297,11 +296,12 @@ class inf_node():
                 
                 print(self.blocks)
                 print(self.getbalance(self.block_height))
+                
             except ConnectionResetError as e:
                 print(e)
-                to_send = json.dumps({"error":1})
-                conn.send(to_send.encode('utf-8'))
-                conn.close()
+                #to_send = json.dumps({"error":1})
+               # conn.send(to_send.encode('utf-8'))
+               # conn.close()
                 
     def sendTransaction(self,address,amount):
         
@@ -393,9 +393,9 @@ class inf_node():
                 conn.close()
             except ConnectionResetError as e:
                 print(e)
-                to_send = json.dumps({"error":1})
-                conn.send(to_send.encode('utf-8'))
-                conn.close()
+               # to_send = json.dumps({"error":1})
+               # conn.send(to_send.encode('utf-8'))
+               # conn.close()
                 
                 
     def getbalance(self, block_height):
@@ -432,7 +432,8 @@ class inf_node():
         
 if __name__ == '__main__':
     
-    file_name = sys.argv[1]
+    #file_name = sys.argv[1]
+    file_name = 'config.json'
     
     with open(file_name, 'r', encoding='utf8') as config_file: 
         config = json.load(config_file)

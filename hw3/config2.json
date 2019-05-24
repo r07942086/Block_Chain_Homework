@@ -1,13 +1,13 @@
 {
 	"mining": true,       
-	"delay": 3,            
+	"delay": 1,            
 	"p2p_port": 11000,
 	"user_port": 11001,
 	"neighbor_list": [
 		{
 			"ip": "127.0.0.1",
-			"p2p_port": 10000,
-			"user_port": 10001
+			"p2p_port":12000,
+			"user_port":12001
 		}
 	],
 	"beneficiary": "2eed78334eadbd2a10e82d1b0f127196b56705de3b2e35937e5e5fbcd85bf28c36c54b2c9096dc7ec63f8ecd617b2c7f21a54c8554c89bb8fadfb9615f29b5e1",
@@ -16,5 +16,5 @@
 		"private_key": "6d9cd70a849b43f70ab8446056e525eb50a07db24bff227990edb05ffb974f89"
 	},
 	"fee": 3,
-	"target" : "0000050000000000000000000000000000000000000000000000000000000000"
+	"target" : "0000100000000000000000000000000000000000000000000000000000000000"
 }
