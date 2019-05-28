@@ -37,7 +37,7 @@ send = {
     ]
   }
 }
-
+'''
 send = { "method": "sendtoaddress",
             "data": {
                 "address": "4643bb6b393ac20a6175c713175734a72517c63d6f73a3ca90a15356f2e967da03d16431441c61ac69aeabb7937d333829d9da50431ff6af38536aa262497b17",
@@ -49,10 +49,10 @@ send = { "method": "sendtoaddress",
 send = {
         "method": "getbalance",
         "data": {
-            "address": "4643bb6b393ac20a6175c713175734a72517c63d6f73a3ca90a15356f2e967da03d16431441c61ac69aeabb7937d333829d9da50431ff6af38536aa262497b27"
+            "address": "4643bb6b393ac20a6175c713175734a72517c63d6f73a3ca90a15356f2e967da03d16431441c61ac69aeabb7937d333829d9da50431ff6af38536aa262497b17"
         }
     }
-
+'''
 to_send = json.dumps(send)
 user_client.connect(("127.0.0.1", 10001))
 try:

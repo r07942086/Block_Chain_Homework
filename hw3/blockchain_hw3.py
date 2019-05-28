@@ -65,8 +65,8 @@ class inf_node():
         while(1):
     
     
-            nonce_raw = random.randint(0,99999999)
-            nonce_pad = '{0:08d}'.format(nonce_raw)
+            nonce_raw = random.randint(0,4294967296)
+            nonce_pad = self.int_to_hex(nonce_raw,8)
             nonce_new = bytes(nonce_pad,encoding='utf8') 
             
 
@@ -103,11 +103,11 @@ class inf_node():
 
                                                             
                 now_block_height = self.block_height +1 
-                now_block = { "prev_block": str(self.prev_block, encoding='utf8'), "version":  2,  "target": str(self.target, encoding='utf8'), "nonce":  int(str(nonce_new, encoding='utf8')),
+                now_block = { "prev_block": str(self.prev_block, encoding='utf8'), "version":  2,  "target": str(self.target, encoding='utf8'), "nonce":  int(str(nonce_new, encoding='utf8'),16),
                              "transactions_hash":  str(self.transactions_hash, encoding='utf8'), "beneficiary": str(self.beneficiary, encoding='utf8'),
                              "transactions": self.now_txs}
                 fail_flag = self.sendBlock(now_block)
-                
+                print(now_block)
                 if fail_flag==True:
                     print('?????')
                 else:
@@ -174,13 +174,13 @@ class inf_node():
         fee_str =  self.int_to_hex(fee,16)
         
         to_sha = bytes(nonce_str + sender_pub_key + to + value_str + fee_str, encoding='utf8')
-        return hashlib.sha256(to_sha).hexdigest()
+        return to_sha
     
 
     def check_sig(self, signature, pub_key, message):
         #                 str       str       bytes
         
-        vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(pub_key), curve=ecdsa.SECP256k1)
+        vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(pub_key), curve=ecdsa.SECP256k1, hashfunc=hashlib.sha256)
         try:
             result = vk.verify(bytes.fromhex(signature), message)
         except:
@@ -202,12 +202,15 @@ class inf_node():
             
             check_3 = data["transactions_hash"] == hashlib.sha256(bytes(sigs,encoding='utf8')).hexdigest()
            
-            block_data = '{0:08d}'.format(data["version"]) + data["prev_block"] +  data["transactions_hash"]  + data["target"] +  data["nonce"] +  data["beneficiary"] 
+            block_data = '{0:08d}'.format(data["version"]) + data["prev_block"] +  data["transactions_hash"]  +  data["target"] +  self.int_to_hex(data["nonce"],8)  +  data["beneficiary"] 
             block_data = bytes(block_data,encoding='utf8')
             
             
-
+            print(block_data)
+            print( hashlib.sha256(block_data).hexdigest())
+            
             check_4 =  hashlib.sha256(block_data).hexdigest() <= data["target"]
+            
             
             check_5 = bytes(data["prev_block"], encoding='utf8') in self.block_hashes
             
@@ -222,7 +225,7 @@ class inf_node():
             
 
             for tx in data["transactions"]:
-                message = bytes(self.sha_tx(tx["nonce"],tx["sender_pub_key"],tx["to"],tx["value"],tx["fee"]),encoding='utf8')
+                message = self.sha_tx(tx["nonce"],tx["sender_pub_key"],tx["to"],tx["value"],tx["fee"])
                 
                 if self.check_sig(tx["signature"], tx["sender_pub_key"], message) and tx["signature"] not in sucess_tx_sigs and balance[tx["sender_pub_key"]] >= (tx["value"]+tx["fee"]):
                     if tx["to"] not in balance:
@@ -253,12 +256,14 @@ class inf_node():
                 print(json_received)
                 
                 if json_received["method"] == "sendBlock":
-                    json_received["data"]["nonce"] = str(json_received["data"]["nonce"])
-
-                    if self.check_vaild(json_received["data"], json_received["height"]):
+                    
+                    if json_received["height"] != self.block_height+1:
+                        sendBlocks_reply = json.dumps({"error":1})
+                        
+                    elif self.check_vaild(json_received["data"], json_received["height"]):
                         self.now_block = json_received["data"]
                         self.block_height +=1
-                        block_data = '{0:08d}'.format(json_received["data"]["version"]) + json_received["data"]["prev_block"] +  json_received["data"]["transactions_hash"] + json_received["data"]["target"] +  json_received["data"]["nonce"] +  json_received["data"]["beneficiary"] 
+                        block_data = '{0:08d}'.format(json_received["data"]["version"]) + json_received["data"]["prev_block"] +  json_received["data"]["transactions_hash"] + json_received["data"]["target"] +  self.int_to_hex(json_received["data"]["nonce"],8) +  json_received["data"]["beneficiary"] 
                         self.prev_block =  bytes(hashlib.sha256(bytes(block_data,encoding='utf8')).hexdigest(),encoding='utf8')
                         self.sucess_txs.append(json_received["data"]["transactions"])
                         self.blocks.append(json_received["data"])
@@ -279,7 +284,7 @@ class inf_node():
                 
                 if json_received["method"] == "sendTransaction":
                     
-                    message = bytes(self.sha_tx(json_received["data"]["nonce"],json_received["data"]["sender_pub_key"],json_received["data"]["to"],json_received["data"]["value"],json_received["data"]["fee"]),encoding='utf8')
+                    message = self.sha_tx(json_received["data"]["nonce"],json_received["data"]["sender_pub_key"],json_received["data"]["to"],json_received["data"]["value"],json_received["data"]["fee"])
                     
                     check = self.check_sig(json_received["data"]["signature"], json_received["data"]["sender_pub_key"], message)
                     
@@ -290,6 +295,8 @@ class inf_node():
                     else:
                         sendTransaction_reply = json.dumps({"error":1})
                         
+                    print(sendTransaction_reply)
+                    
                     buffer = sendTransaction_reply.encode('utf-8')
                     conn.send(buffer)
                 conn.close()
@@ -312,9 +319,9 @@ class inf_node():
         value = amount
         fee = 0
         
-        message = bytes(self.sha_tx(nonce,sender_pub_key,to,value,fee), encoding='utf8')
+        message = self.sha_tx(nonce,sender_pub_key,to,value,fee)
         private_key = ecdsa.SigningKey.from_string(bytes.fromhex(self.wallet["private_key"]), curve=ecdsa.SECP256k1)
-        signature = private_key.sign(message).hex()
+        signature = private_key.sign(message, hashfunc=hashlib.sha256).hex()
         
         data = {"nonce": nonce,
                 "sender_pub_key": sender_pub_key,
@@ -432,8 +439,8 @@ class inf_node():
         
 if __name__ == '__main__':
     
-    #file_name = sys.argv[1]
-    file_name = 'config.json'
+    file_name = sys.argv[1]
+    #file_name = 'config.json'
     
     with open(file_name, 'r', encoding='utf8') as config_file: 
         config = json.load(config_file)
