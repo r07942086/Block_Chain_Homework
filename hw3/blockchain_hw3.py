@@ -125,8 +125,7 @@ class inf_node():
                     self.transactions_hash =  b"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     self.balance = self.getbalance(self.block_height)
                     
-                    print(self.blocks)
-                    print(self.getbalance(self.block_height))
+
             
 
         
@@ -206,8 +205,7 @@ class inf_node():
             block_data = bytes(block_data,encoding='utf8')
             
             
-            print(block_data)
-            print( hashlib.sha256(block_data).hexdigest())
+
             
             check_4 =  hashlib.sha256(block_data).hexdigest() <= data["target"]
             
@@ -235,7 +233,7 @@ class inf_node():
                     
                 else:
                     check_6 = False
-            print(check_1,check_2,check_3,check_4,check_5,check_6, sep=' ')
+            #print(check_1,check_2,check_3,check_4,check_5,check_6, sep=' ')
             
             return check_1 and check_2 and check_3 and check_4 and check_5 and check_6
     
@@ -295,14 +293,11 @@ class inf_node():
                     else:
                         sendTransaction_reply = json.dumps({"error":1})
                         
-                    print(sendTransaction_reply)
                     
                     buffer = sendTransaction_reply.encode('utf-8')
                     conn.send(buffer)
                 conn.close()
                 
-                print(self.blocks)
-                print(self.getbalance(self.block_height))
                 
             except ConnectionResetError as e:
                 print(e)
